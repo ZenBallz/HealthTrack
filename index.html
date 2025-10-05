@@ -7,442 +7,382 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Health Tracker">
     <title>Health Tracker</title>
-    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(to bottom, #eff6ff, #ffffff);
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+        h1 { font-size: 24px; font-weight: bold; color: #1f2937; margin-bottom: 24px; }
+        .card { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .period { font-size: 14px; font-weight: 500; color: #4b5563; }
+        .mic-btn { 
+            width: 48px; height: 48px; border-radius: 50%; border: none; 
+            color: white; cursor: pointer; font-size: 20px;
+        }
+        .mic-btn.idle { background: #3b82f6; }
+        .mic-btn.listening { background: #ef4444; }
+        input[type="number"], input[type="time"], textarea {
+            width: 100%; padding: 8px; border: 1px solid #d1d5db; 
+            border-radius: 4px; font-size: 14px; margin-bottom: 12px;
+        }
+        textarea { resize: vertical; font-family: inherit; }
+        .slider-container { margin-bottom: 12px; }
+        .slider-label { font-size: 14px; color: #4b5563; margin-bottom: 4px; display: block; }
+        input[type="range"] { width: 100%; }
+        .checkbox-container { margin-bottom: 12px; }
+        .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+        .checkbox-label input { width: 16px; height: 16px; cursor: pointer; }
+        .severity-slider { margin-left: 24px; margin-top: 8px; }
+        .save-btn {
+            width: 100%; padding: 12px; background: #3b82f6; color: white;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: 500;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .export-btn {
+            width: 100%; padding: 8px; background: #10b981; color: white;
+            border: none; border-radius: 4px; font-size: 14px; margin-bottom: 16px; cursor: pointer;
+        }
+        .entry-card { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 12px; }
+        .entry-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .entry-date { font-weight: 500; color: #1f2937; }
+        .entry-time { font-size: 12px; color: #6b7280; }
+        .entry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 14px; color: #4b5563; }
+        .entry-notes { margin-top: 8px; font-size: 14px; color: #374151; font-style: italic; }
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0; background: white;
+            border-top: 1px solid #e5e7eb; display: flex;
+        }
+        .nav-btn {
+            flex: 1; padding: 16px; border: none; background: none;
+            color: #9ca3af; cursor: pointer; font-size: 24px;
+        }
+        .nav-btn.active { color: #3b82f6; }
+        .settings-input { margin-bottom: 16px; }
+        .settings-label { font-size: 14px; color: #4b5563; display: block; margin-bottom: 4px; }
+        .settings-note { font-size: 12px; color: #6b7280; }
+        .hidden { display: none; }
+    </style>
 </head>
 <body>
-    <div id="root"></div>
-    
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { Mic, Plus, TrendingUp, Settings, Moon, Sun } = lucide;
+    <div class="container">
+        <h1>🩺 Health Tracker</h1>
+        
+        <div id="entryView">
+            <div class="card">
+                <div class="header">
+                    <span class="period" id="periodLabel">Morning Check-in</span>
+                    <button class="mic-btn idle" id="micBtn" onclick="startVoice()">🎤</button>
+                </div>
 
-        function FeverTracker() {
-          const [entries, setEntries] = useState([]);
-          const [currentEntry, setCurrentEntry] = useState({
-            weight: '',
-            wakeTime: '',
-            sleepTime: '',
-            temperature: '',
-            fatigue: 5,
-            mood: 5,
-            lymphLeft: false,
-            lymphLeftSeverity: 3,
-            lymphRight: false,
-            lymphRightSeverity: 3,
-            mouthSores: false,
-            colchicine: false,
-            notes: '',
-            timestamp: new Date().toISOString(),
-            period: new Date().getHours() < 12 ? 'morning' : 'evening'
-          });
-          const [view, setView] = useState('entry');
-          const [isListening, setIsListening] = useState(false);
-          const [morningTime, setMorningTime] = useState('08:00');
-          const [eveningTime, setEveningTime] = useState('20:00');
+                <input type="number" id="weight" placeholder="Weight (kg)" step="0.1">
+                <input type="time" id="wakeTime">
+                <input type="time" id="sleepTime">
+                <input type="number" id="temperature" placeholder="Temperature (°C)" step="0.1">
 
-          useEffect(() => {
-            const saved = localStorage.getItem('feverEntries');
-            if (saved) setEntries(JSON.parse(saved));
+                <div class="slider-container">
+                    <label class="slider-label">Fatigue/Energy: <span id="fatigueVal">5</span>/10</label>
+                    <input type="range" id="fatigue" min="1" max="10" value="5" oninput="updateFatigue(this.value)">
+                </div>
+
+                <div class="slider-container">
+                    <label class="slider-label">Mood: <span id="moodEmoji">😐</span></label>
+                    <input type="range" id="mood" min="1" max="10" value="5" oninput="updateMood(this.value)">
+                </div>
+
+                <div class="checkbox-container">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="lymphLeft" onchange="toggleLymphLeft(this.checked)">
+                        <span>Lymph Left</span>
+                    </label>
+                    <div id="lymphLeftSlider" class="severity-slider hidden">
+                        <label class="slider-label">Severity: <span id="lymphLeftVal">3</span>/5</label>
+                        <input type="range" id="lymphLeftSeverity" min="1" max="5" value="3" oninput="updateLymphLeft(this.value)">
+                    </div>
+                </div>
+
+                <div class="checkbox-container">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="lymphRight" onchange="toggleLymphRight(this.checked)">
+                        <span>Lymph Right</span>
+                    </label>
+                    <div id="lymphRightSlider" class="severity-slider hidden">
+                        <label class="slider-label">Severity: <span id="lymphRightVal">3</span>/5</label>
+                        <input type="range" id="lymphRightSeverity" min="1" max="5" value="3" oninput="updateLymphRight(this.value)">
+                    </div>
+                </div>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" id="mouthSores">
+                    <span>Mouth Sores</span>
+                </label>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" id="colchicine">
+                    <span>Colchicine Taken</span>
+                </label>
+
+                <textarea id="notes" rows="3" placeholder="Additional notes..."></textarea>
+
+                <button class="save-btn" onclick="saveEntry()">
+                    ➕ Save Entry
+                </button>
+            </div>
+        </div>
+
+        <div id="historyView" class="hidden">
+            <button class="export-btn" onclick="exportData()">Export to CSV</button>
+            <div id="entriesList"></div>
+        </div>
+
+        <div id="settingsView" class="hidden">
+            <div class="card">
+                <h2 style="font-size: 18px; margin-bottom: 16px;">Reminder Times</h2>
+                <div class="settings-input">
+                    <label class="settings-label">Morning Check-in</label>
+                    <input type="time" id="morningTime" value="08:00">
+                </div>
+                <div class="settings-input">
+                    <label class="settings-label">Evening Check-in</label>
+                    <input type="time" id="eveningTime" value="20:00">
+                </div>
+                <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+                <p class="settings-note" style="margin-top: 12px;">Note: Set iOS reminders at these times to open the app</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-btn active" id="navEntry" onclick="switchView('entry')">➕</button>
+        <button class="nav-btn" id="navHistory" onclick="switchView('history')">📈</button>
+        <button class="nav-btn" id="navSettings" onclick="switchView('settings')">⚙️</button>
+    </div>
+
+    <script>
+        let entries = JSON.parse(localStorage.getItem('feverEntries') || '[]');
+        
+        function updatePeriod() {
+            const hour = new Date().getHours();
+            const period = hour < 12 ? 'morning' : 'evening';
+            document.getElementById('periodLabel').textContent = 
+                (period === 'morning' ? '☀️ ' : '🌙 ') + period.charAt(0).toUpperCase() + period.slice(1) + ' Check-in';
+        }
+
+        function updateFatigue(val) {
+            document.getElementById('fatigueVal').textContent = val;
+        }
+
+        function updateMood(val) {
+            const emojis = ['😢','😢','😕','😕','😐','😐','🙂','🙂','😊','😊'];
+            document.getElementById('moodEmoji').textContent = emojis[val-1];
+        }
+
+        function toggleLymphLeft(checked) {
+            document.getElementById('lymphLeftSlider').classList.toggle('hidden', !checked);
+        }
+
+        function toggleLymphRight(checked) {
+            document.getElementById('lymphRightSlider').classList.toggle('hidden', !checked);
+        }
+
+        function updateLymphLeft(val) {
+            document.getElementById('lymphLeftVal').textContent = val;
+        }
+
+        function updateLymphRight(val) {
+            document.getElementById('lymphRightVal').textContent = val;
+        }
+
+        function saveEntry() {
+            const entry = {
+                timestamp: new Date().toISOString(),
+                period: new Date().getHours() < 12 ? 'morning' : 'evening',
+                weight: document.getElementById('weight').value,
+                wakeTime: document.getElementById('wakeTime').value,
+                sleepTime: document.getElementById('sleepTime').value,
+                temperature: document.getElementById('temperature').value,
+                fatigue: document.getElementById('fatigue').value,
+                mood: document.getElementById('mood').value,
+                lymphLeft: document.getElementById('lymphLeft').checked,
+                lymphLeftSeverity: document.getElementById('lymphLeftSeverity').value,
+                lymphRight: document.getElementById('lymphRight').checked,
+                lymphRightSeverity: document.getElementById('lymphRightSeverity').value,
+                mouthSores: document.getElementById('mouthSores').checked,
+                colchicine: document.getElementById('colchicine').checked,
+                notes: document.getElementById('notes').value
+            };
+
+            entries.unshift(entry);
+            localStorage.setItem('feverEntries', JSON.stringify(entries));
             
-            const savedMorning = localStorage.getItem('morningTime');
-            const savedEvening = localStorage.getItem('eveningTime');
-            if (savedMorning) setMorningTime(savedMorning);
-            if (savedEvening) setEveningTime(savedEvening);
-          }, []);
-
-          const saveEntry = () => {
-            const newEntry = { ...currentEntry, timestamp: new Date().toISOString() };
-            const updated = [newEntry, ...entries];
-            setEntries(updated);
-            localStorage.setItem('feverEntries', JSON.stringify(updated));
+            // Reset form
+            document.getElementById('weight').value = '';
+            document.getElementById('wakeTime').value = '';
+            document.getElementById('sleepTime').value = '';
+            document.getElementById('temperature').value = '';
+            document.getElementById('fatigue').value = 5;
+            document.getElementById('mood').value = 5;
+            document.getElementById('lymphLeft').checked = false;
+            document.getElementById('lymphRight').checked = false;
+            document.getElementById('mouthSores').checked = false;
+            document.getElementById('colchicine').checked = false;
+            document.getElementById('notes').value = '';
+            toggleLymphLeft(false);
+            toggleLymphRight(false);
+            updateFatigue(5);
+            updateMood(5);
             
-            setCurrentEntry({
-              weight: '',
-              wakeTime: '',
-              sleepTime: '',
-              temperature: '',
-              fatigue: 5,
-              mood: 5,
-              lymphLeft: false,
-              lymphLeftSeverity: 3,
-              lymphRight: false,
-              lymphRightSeverity: 3,
-              mouthSores: false,
-              colchicine: false,
-              notes: '',
-              timestamp: new Date().toISOString(),
-              period: new Date().getHours() < 12 ? 'morning' : 'evening'
-            });
-            
-            setView('history');
-          };
+            switchView('history');
+        }
 
-          const startVoiceInput = () => {
+        function renderEntries() {
+            const list = document.getElementById('entriesList');
+            list.innerHTML = entries.map(e => {
+                const date = new Date(e.timestamp);
+                return `
+                    <div class="entry-card">
+                        <div class="entry-header">
+                            <span class="entry-date">${date.toLocaleDateString()} - ${e.period}</span>
+                            <span class="entry-time">${date.toLocaleTimeString()}</span>
+                        </div>
+                        <div class="entry-grid">
+                            ${e.weight ? `<div>Weight: ${e.weight} kg</div>` : ''}
+                            ${e.wakeTime ? `<div>Wake: ${e.wakeTime}</div>` : ''}
+                            ${e.sleepTime ? `<div>Sleep: ${e.sleepTime}</div>` : ''}
+                            ${e.temperature ? `<div>Temp: ${e.temperature}°C</div>` : ''}
+                            <div>Energy: ${e.fatigue}/10</div>
+                            <div>Mood: ${e.mood}/10</div>
+                            ${e.lymphLeft ? `<div>Lymph L: ${e.lymphLeftSeverity}/5</div>` : ''}
+                            ${e.lymphRight ? `<div>Lymph R: ${e.lymphRightSeverity}/5</div>` : ''}
+                            ${e.mouthSores ? '<div>Mouth sores ✓</div>' : ''}
+                            ${e.colchicine ? '<div>Colchicine ✓</div>' : ''}
+                        </div>
+                        ${e.notes ? `<div class="entry-notes">${e.notes}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function exportData() {
+            const csv = [
+                ['Date', 'Period', 'Weight', 'Wake Time', 'Sleep Time', 'Temperature', 'Fatigue', 'Mood', 'Lymph Left', 'Lymph Left Severity', 'Lymph Right', 'Lymph Right Severity', 'Mouth Sores', 'Colchicine', 'Notes'],
+                ...entries.map(e => [
+                    new Date(e.timestamp).toLocaleDateString(),
+                    e.period,
+                    e.weight,
+                    e.wakeTime,
+                    e.sleepTime,
+                    e.temperature,
+                    e.fatigue,
+                    e.mood,
+                    e.lymphLeft,
+                    e.lymphLeft ? e.lymphLeftSeverity : '',
+                    e.lymphRight,
+                    e.lymphRight ? e.lymphRightSeverity : '',
+                    e.mouthSores,
+                    e.colchicine,
+                    e.notes
+                ])
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'health-tracker-data.csv';
+            a.click();
+        }
+
+        function saveSettings() {
+            localStorage.setItem('morningTime', document.getElementById('morningTime').value);
+            localStorage.setItem('eveningTime', document.getElementById('eveningTime').value);
+            switchView('entry');
+        }
+
+        function switchView(view) {
+            document.getElementById('entryView').classList.add('hidden');
+            document.getElementById('historyView').classList.add('hidden');
+            document.getElementById('settingsView').classList.add('hidden');
+            
+            document.getElementById('navEntry').classList.remove('active');
+            document.getElementById('navHistory').classList.remove('active');
+            document.getElementById('navSettings').classList.remove('active');
+            
+            if (view === 'entry') {
+                document.getElementById('entryView').classList.remove('hidden');
+                document.getElementById('navEntry').classList.add('active');
+            } else if (view === 'history') {
+                document.getElementById('historyView').classList.remove('hidden');
+                document.getElementById('navHistory').classList.add('active');
+                renderEntries();
+            } else if (view === 'settings') {
+                document.getElementById('settingsView').classList.remove('hidden');
+                document.getElementById('navSettings').classList.add('active');
+            }
+        }
+
+        function startVoice() {
             if (!('webkitSpeechRecognition' in window)) {
-              alert('Voice input not supported in this browser');
-              return;
+                alert('Voice input not supported in this browser');
+                return;
             }
 
             const recognition = new webkitSpeechRecognition();
             recognition.continuous = true;
             recognition.interimResults = false;
 
-            recognition.onstart = () => setIsListening(true);
-            recognition.onend = () => setIsListening(false);
+            const btn = document.getElementById('micBtn');
+            btn.classList.remove('idle');
+            btn.classList.add('listening');
+
+            recognition.onend = () => {
+                btn.classList.remove('listening');
+                btn.classList.add('idle');
+            };
 
             recognition.onresult = (event) => {
-              const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-              
-              const weightMatch = transcript.match(/(\d+\.?\d*)\s*(kg|kilogram|pound|lb)/);
-              if (weightMatch) {
-                setCurrentEntry(prev => ({ ...prev, weight: weightMatch[1] }));
-              }
+                const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+                
+                const weightMatch = transcript.match(/(\d+\.?\d*)\s*(kg|kilogram|pound|lb)/);
+                if (weightMatch) document.getElementById('weight').value = weightMatch[1];
 
-              const tempMatch = transcript.match(/(\d+\.?\d*)\s*(degree|celsius|fahrenheit)/);
-              if (tempMatch) {
-                setCurrentEntry(prev => ({ ...prev, temperature: tempMatch[1] }));
-              }
+                const tempMatch = transcript.match(/(\d+\.?\d*)\s*(degree|celsius|fahrenheit)/);
+                if (tempMatch) document.getElementById('temperature').value = tempMatch[1];
 
-              const timeMatch = transcript.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)?/);
-              if (timeMatch) {
-                setCurrentEntry(prev => ({ ...prev, wakeTime: timeMatch[0] }));
-              }
+                if (transcript.includes('colchicine') || transcript.includes('medication')) {
+                    document.getElementById('colchicine').checked = true;
+                }
 
-              if (transcript.includes('colchicine') || transcript.includes('medication')) {
-                setCurrentEntry(prev => ({ ...prev, colchicine: true }));
-              }
+                if (transcript.includes('mouth sore') || transcript.includes('sores')) {
+                    document.getElementById('mouthSores').checked = true;
+                }
 
-              if (transcript.includes('mouth sore') || transcript.includes('sores')) {
-                setCurrentEntry(prev => ({ ...prev, mouthSores: true }));
-              }
+                if (transcript.includes('left') && (transcript.includes('lymph') || transcript.includes('node'))) {
+                    document.getElementById('lymphLeft').checked = true;
+                    toggleLymphLeft(true);
+                }
 
-              if (transcript.includes('left') && (transcript.includes('lymph') || transcript.includes('node'))) {
-                setCurrentEntry(prev => ({ ...prev, lymphLeft: true }));
-              }
-
-              if (transcript.includes('right') && (transcript.includes('lymph') || transcript.includes('node'))) {
-                setCurrentEntry(prev => ({ ...prev, lymphRight: true }));
-              }
+                if (transcript.includes('right') && (transcript.includes('lymph') || transcript.includes('node'))) {
+                    document.getElementById('lymphRight').checked = true;
+                    toggleLymphRight(true);
+                }
             };
 
             recognition.start();
             setTimeout(() => recognition.stop(), 5000);
-          };
-
-          const exportData = () => {
-            const csv = [
-              ['Date', 'Period', 'Weight', 'Wake Time', 'Sleep Time', 'Temperature', 'Fatigue', 'Mood', 'Lymph Left', 'Lymph Left Severity', 'Lymph Right', 'Lymph Right Severity', 'Mouth Sores', 'Colchicine', 'Notes'],
-              ...entries.map(e => [
-                new Date(e.timestamp).toLocaleDateString(),
-                e.period,
-                e.weight,
-                e.wakeTime,
-                e.sleepTime,
-                e.temperature,
-                e.fatigue,
-                e.mood,
-                e.lymphLeft,
-                e.lymphLeft ? e.lymphLeftSeverity : '',
-                e.lymphRight,
-                e.lymphRight ? e.lymphRightSeverity : '',
-                e.mouthSores,
-                e.colchicine,
-                e.notes
-              ])
-            ].map(row => row.join(',')).join('\n');
-
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'fever-tracker-data.csv';
-            a.click();
-          };
-
-          const saveSettings = () => {
-            localStorage.setItem('morningTime', morningTime);
-            localStorage.setItem('eveningTime', eveningTime);
-            setView('entry');
-          };
-
-          const Icon = ({ icon: IconComponent, ...props }) => {
-            return React.createElement(IconComponent, props);
-          };
-
-          return (
-            <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pb-20">
-              <div className="max-w-md mx-auto p-4">
-                <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                  🩺 Health Tracker
-                </h1>
-
-                {view === 'entry' && (
-                  <div className="space-y-4">
-                    <div className="bg-white rounded-lg p-4 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-sm font-medium text-gray-600">
-                          <Icon icon={currentEntry.period === 'morning' ? Sun : Moon} className="inline w-4 h-4 mr-1" />
-                          {currentEntry.period.charAt(0).toUpperCase() + currentEntry.period.slice(1)} Check-in
-                        </span>
-                        <button
-                          onClick={startVoiceInput}
-                          className={`p-3 rounded-full ${isListening ? 'bg-red-500' : 'bg-blue-500'} text-white`}
-                        >
-                          <Icon icon={Mic} className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      <div className="space-y-3">
-                        <input
-                          type="number"
-                          placeholder="Weight (kg)"
-                          value={currentEntry.weight}
-                          onChange={(e) => setCurrentEntry({...currentEntry, weight: e.target.value})}
-                          className="w-full p-2 border rounded"
-                        />
-
-                        <input
-                          type="time"
-                          placeholder="Wake time"
-                          value={currentEntry.wakeTime}
-                          onChange={(e) => setCurrentEntry({...currentEntry, wakeTime: e.target.value})}
-                          className="w-full p-2 border rounded"
-                        />
-
-                        <input
-                          type="time"
-                          placeholder="Sleep time"
-                          value={currentEntry.sleepTime}
-                          onChange={(e) => setCurrentEntry({...currentEntry, sleepTime: e.target.value})}
-                          className="w-full p-2 border rounded"
-                        />
-
-                        <input
-                          type="number"
-                          placeholder="Temperature (°C)"
-                          step="0.1"
-                          value={currentEntry.temperature}
-                          onChange={(e) => setCurrentEntry({...currentEntry, temperature: e.target.value})}
-                          className="w-full p-2 border rounded"
-                        />
-
-                        <div>
-                          <label className="text-sm text-gray-600">Fatigue/Energy: {currentEntry.fatigue}/10</label>
-                          <input
-                            type="range"
-                            min="1"
-                            max="10"
-                            value={currentEntry.fatigue}
-                            onChange={(e) => setCurrentEntry({...currentEntry, fatigue: e.target.value})}
-                            className="w-full"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-sm text-gray-600">Mood: {['😢','😕','😐','🙂','😊'][Math.floor((currentEntry.mood-1)/2)]}</label>
-                          <input
-                            type="range"
-                            min="1"
-                            max="10"
-                            value={currentEntry.mood}
-                            onChange={(e) => setCurrentEntry({...currentEntry, mood: e.target.value})}
-                            className="w-full"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={currentEntry.lymphLeft}
-                              onChange={(e) => setCurrentEntry({...currentEntry, lymphLeft: e.target.checked})}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm">Lymph Left</span>
-                          </label>
-                          {currentEntry.lymphLeft && (
-                            <div className="ml-6">
-                              <label className="text-sm text-gray-600">Severity: {currentEntry.lymphLeftSeverity}/5</label>
-                              <input
-                                type="range"
-                                min="1"
-                                max="5"
-                                value={currentEntry.lymphLeftSeverity}
-                                onChange={(e) => setCurrentEntry({...currentEntry, lymphLeftSeverity: e.target.value})}
-                                className="w-full"
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={currentEntry.lymphRight}
-                              onChange={(e) => setCurrentEntry({...currentEntry, lymphRight: e.target.checked})}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm">Lymph Right</span>
-                          </label>
-                          {currentEntry.lymphRight && (
-                            <div className="ml-6">
-                              <label className="text-sm text-gray-600">Severity: {currentEntry.lymphRightSeverity}/5</label>
-                              <input
-                                type="range"
-                                min="1"
-                                max="5"
-                                value={currentEntry.lymphRightSeverity}
-                                onChange={(e) => setCurrentEntry({...currentEntry, lymphRightSeverity: e.target.value})}
-                                className="w-full"
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={currentEntry.mouthSores}
-                            onChange={(e) => setCurrentEntry({...currentEntry, mouthSores: e.target.checked})}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm">Mouth Sores</span>
-                        </label>
-
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={currentEntry.colchicine}
-                            onChange={(e) => setCurrentEntry({...currentEntry, colchicine: e.target.checked})}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm">Colchicine Taken</span>
-                        </label>
-
-                        <textarea
-                          placeholder="Additional notes..."
-                          value={currentEntry.notes}
-                          onChange={(e) => setCurrentEntry({...currentEntry, notes: e.target.value})}
-                          className="w-full p-2 border rounded"
-                          rows="3"
-                        />
-                      </div>
-
-                      <button
-                        onClick={saveEntry}
-                        className="w-full mt-4 bg-blue-500 text-white p-3 rounded-lg font-medium flex items-center justify-center gap-2"
-                      >
-                        <Icon icon={Plus} className="w-5 h-5" />
-                        Save Entry
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {view === 'history' && (
-                  <div className="space-y-4">
-                    <button onClick={exportData} className="w-full bg-green-500 text-white p-2 rounded mb-4">
-                      Export to CSV
-                    </button>
-                    
-                    {entries.map((entry, idx) => (
-                      <div key={idx} className="bg-white rounded-lg p-4 shadow-sm">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="font-medium text-gray-800">
-                            {new Date(entry.timestamp).toLocaleDateString()} - {entry.period}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(entry.timestamp).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                          {entry.weight && <div>Weight: {entry.weight} kg</div>}
-                          {entry.wakeTime && <div>Wake: {entry.wakeTime}</div>}
-                          {entry.sleepTime && <div>Sleep: {entry.sleepTime}</div>}
-                          {entry.temperature && <div>Temp: {entry.temperature}°C</div>}
-                          <div>Energy: {entry.fatigue}/10</div>
-                          <div>Mood: {entry.mood}/10</div>
-                          {entry.lymphLeft && (
-                            <div>Lymph L: {entry.lymphLeftSeverity}/5</div>
-                          )}
-                          {entry.lymphRight && (
-                            <div>Lymph R: {entry.lymphRightSeverity}/5</div>
-                          )}
-                          {entry.mouthSores && <div>Mouth sores ✓</div>}
-                          {entry.colchicine && <div>Colchicine ✓</div>}
-                        </div>
-                        {entry.notes && (
-                          <div className="mt-2 text-sm text-gray-700 italic">{entry.notes}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {view === 'settings' && (
-                  <div className="bg-white rounded-lg p-4 shadow-sm space-y-4">
-                    <h2 className="font-medium text-lg">Reminder Times</h2>
-                    <div>
-                      <label className="text-sm text-gray-600">Morning Check-in</label>
-                      <input
-                        type="time"
-                        value={morningTime}
-                        onChange={(e) => setMorningTime(e.target.value)}
-                        className="w-full p-2 border rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-600">Evening Check-in</label>
-                      <input
-                        type="time"
-                        value={eveningTime}
-                        onChange={(e) => setEveningTime(e.target.value)}
-                        className="w-full p-2 border rounded"
-                      />
-                    </div>
-                    <button
-                      onClick={saveSettings}
-                      className="w-full bg-blue-500 text-white p-3 rounded-lg font-medium"
-                    >
-                      Save Settings
-                    </button>
-                    <p className="text-xs text-gray-500">
-                      Note: Set iOS reminders at these times to open the app
-                    </p>
-                  </div>
-                )}
-
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t flex">
-                  <button
-                    onClick={() => setView('entry')}
-                    className={`flex-1 p-4 ${view === 'entry' ? 'text-blue-500' : 'text-gray-400'}`}
-                  >
-                    <Icon icon={Plus} className="w-6 h-6 mx-auto" />
-                  </button>
-                  <button
-                    onClick={() => setView('history')}
-                    className={`flex-1 p-4 ${view === 'history' ? 'text-blue-500' : 'text-gray-400'}`}
-                  >
-                    <Icon icon={TrendingUp} className="w-6 h-6 mx-auto" />
-                  </button>
-                  <button
-                    onClick={() => setView('settings')}
-                    className={`flex-1 p-4 ${view === 'settings' ? 'text-blue-500' : 'text-gray-400'}`}
-                  >
-                    <Icon icon={Settings} className="w-6 h-6 mx-auto" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
         }
 
-        ReactDOM.render(<FeverTracker />, document.getElementById('root'));
+        // Load saved settings
+        const savedMorning = localStorage.getItem('morningTime');
+        const savedEvening = localStorage.getItem('eveningTime');
+        if (savedMorning) document.getElementById('morningTime').value = savedMorning;
+        if (savedEvening) document.getElementById('eveningTime').value = savedEvening;
+        
+        updatePeriod();
     </script>
 </body>
 </html>
