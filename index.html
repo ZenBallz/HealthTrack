@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Health Tracker">
+    <title>Health Tracker</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { Mic, Plus, TrendingUp, Settings, Moon, Sun } = lucide;
+
+        function FeverTracker() {
+          const [entries, setEntries] = useState([]);
+          const [currentEntry, setCurrentEntry] = useState({
+            weight: '',
+            wakeTime: '',
+            sleepTime: '',
+            temperature: '',
+            fatigue: 5,
+            mood: 5,
+            lymphLeft: false,
+            lymphLeftSeverity: 3,
+            lymphRight: false,
+            lymphRightSeverity: 3,
+            mouthSores: false,
+            colchicine: false,
+            notes: '',
+            timestamp: new Date().toISOString(),
+            period: new Date().getHours() < 12 ? 'morning' : 'evening'
+          });
+          const [view, setView] = useState('entry');
+          const [isListening, setIsListening] = useState(false);
+          const [morningTime, setMorningTime] = useState('08:00');
+          const [eveningTime, setEveningTime] = useState('20:00');
+
+          useEffect(() => {
+            const saved = localStorage.getItem('feverEntries');
+            if (saved) setEntries(JSON.parse(saved));
+            
+            const savedMorning = localStorage.getItem('morningTime');
+            const savedEvening = localStorage.getItem('eveningTime');
+            if (savedMorning) setMorningTime(savedMorning);
+            if (savedEvening) setEveningTime(savedEvening);
+          }, []);
+
+          const saveEntry = () => {
+            const newEntry = { ...currentEntry, timestamp: new Date().toISOString() };
+            const updated = [newEntry, ...entries];
+            setEntries(updated);
+            localStorage.setItem('feverEntries', JSON.stringify(updated));
+            
+            setCurrentEntry({
+              weight: '',
+              wakeTime: '',
+              sleepTime: '',
+              temperature: '',
+              fatigue: 5,
+              mood: 5,
+              lymphLeft: false,
+              lymphLeftSeverity: 3,
+              lymphRight: false,
+              lymphRightSeverity: 3,
+              mouthSores: false,
+              colchicine: false,
+              notes: '',
+              timestamp: new Date().toISOString(),
+              period: new Date().getHours() < 12 ? 'morning' : 'evening'
+            });
+            
+            setView('history');
+          };
+
+          const startVoiceInput = () => {
+            if (!('webkitSpeechRecognition' in window)) {
+              alert('Voice input not supported in this browser');
+              return;
+            }
+
+            const recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => setIsListening(true);
+            recognition.onend = () => setIsListening(false);
+
+            recognition.onresult = (event) => {
+              const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+              
+              const weightMatch = transcript.match(/(\d+\.?\d*)\s*(kg|kilogram|pound|lb)/);
+              if (weightMatch) {
+                setCurrentEntry(prev => ({ ...prev, weight: weightMatch[1] }));
+              }
+
+              const tempMatch = transcript.match(/(\d+\.?\d*)\s*(degree|celsius|fahrenheit)/);
+              if (tempMatch) {
+                setCurrentEntry(prev => ({ ...prev, temperature: tempMatch[1] }));
+              }
+
+              const timeMatch = transcript.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)?/);
+              if (timeMatch) {
+                setCurrentEntry(prev => ({ ...prev, wakeTime: timeMatch[0] }));
+              }
+
+              if (transcript.includes('colchicine') || transcript.includes('medication')) {
+                setCurrentEntry(prev => ({ ...prev, colchicine: true }));
+              }
+
+              if (transcript.includes('mouth sore') || transcript.includes('sores')) {
+                setCurrentEntry(prev => ({ ...prev, mouthSores: true }));
+              }
+
+              if (transcript.includes('left') && (transcript.includes('lymph') || transcript.includes('node'))) {
+                setCurrentEntry(prev => ({ ...prev, lymphLeft: true }));
+              }
+
+              if (transcript.includes('right') && (transcript.includes('lymph') || transcript.includes('node'))) {
+                setCurrentEntry(prev => ({ ...prev, lymphRight: true }));
+              }
+            };
+
+            recognition.start();
+            setTimeout(() => recognition.stop(), 5000);
+          };
+
+          const exportData = () => {
+            const csv = [
+              ['Date', 'Period', 'Weight', 'Wake Time', 'Sleep Time', 'Temperature', 'Fatigue', 'Mood', 'Lymph Left', 'Lymph Left Severity', 'Lymph Right', 'Lymph Right Severity', 'Mouth Sores', 'Colchicine', 'Notes'],
+              ...entries.map(e => [
+                new Date(e.timestamp).toLocaleDateString(),
+                e.period,
+                e.weight,
+                e.wakeTime,
+                e.sleepTime,
+                e.temperature,
+                e.fatigue,
+                e.mood,
+                e.lymphLeft,
+                e.lymphLeft ? e.lymphLeftSeverity : '',
+                e.lymphRight,
+                e.lymphRight ? e.lymphRightSeverity : '',
+                e.mouthSores,
+                e.colchicine,
+                e.notes
+              ])
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'fever-tracker-data.csv';
+            a.click();
+          };
+
+          const saveSettings = () => {
+            localStorage.setItem('morningTime', morningTime);
+            localStorage.setItem('eveningTime', eveningTime);
+            setView('entry');
+          };
+
+          const Icon = ({ icon: IconComponent, ...props }) => {
+            return React.createElement(IconComponent, props);
+          };
+
+          return (
+            <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pb-20">
+              <div className="max-w-md mx-auto p-4">
+                <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                  🩺 Health Tracker
+                </h1>
+
+                {view === 'entry' && (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-sm font-medium text-gray-600">
+                          <Icon icon={currentEntry.period === 'morning' ? Sun : Moon} className="inline w-4 h-4 mr-1" />
+                          {currentEntry.period.charAt(0).toUpperCase() + currentEntry.period.slice(1)} Check-in
+                        </span>
+                        <button
+                          onClick={startVoiceInput}
+                          className={`p-3 rounded-full ${isListening ? 'bg-red-500' : 'bg-blue-500'} text-white`}
+                        >
+                          <Icon icon={Mic} className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <input
+                          type="number"
+                          placeholder="Weight (kg)"
+                          value={currentEntry.weight}
+                          onChange={(e) => setCurrentEntry({...currentEntry, weight: e.target.value})}
+                          className="w-full p-2 border rounded"
+                        />
+
+                        <input
+                          type="time"
+                          placeholder="Wake time"
+                          value={currentEntry.wakeTime}
+                          onChange={(e) => setCurrentEntry({...currentEntry, wakeTime: e.target.value})}
+                          className="w-full p-2 border rounded"
+                        />
+
+                        <input
+                          type="time"
+                          placeholder="Sleep time"
+                          value={currentEntry.sleepTime}
+                          onChange={(e) => setCurrentEntry({...currentEntry, sleepTime: e.target.value})}
+                          className="w-full p-2 border rounded"
+                        />
+
+                        <input
+                          type="number"
+                          placeholder="Temperature (°C)"
+                          step="0.1"
+                          value={currentEntry.temperature}
+                          onChange={(e) => setCurrentEntry({...currentEntry, temperature: e.target.value})}
+                          className="w-full p-2 border rounded"
+                        />
+
+                        <div>
+                          <label className="text-sm text-gray-600">Fatigue/Energy: {currentEntry.fatigue}/10</label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={currentEntry.fatigue}
+                            onChange={(e) => setCurrentEntry({...currentEntry, fatigue: e.target.value})}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-gray-600">Mood: {['😢','😕','😐','🙂','😊'][Math.floor((currentEntry.mood-1)/2)]}</label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={currentEntry.mood}
+                            onChange={(e) => setCurrentEntry({...currentEntry, mood: e.target.value})}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={currentEntry.lymphLeft}
+                              onChange={(e) => setCurrentEntry({...currentEntry, lymphLeft: e.target.checked})}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">Lymph Left</span>
+                          </label>
+                          {currentEntry.lymphLeft && (
+                            <div className="ml-6">
+                              <label className="text-sm text-gray-600">Severity: {currentEntry.lymphLeftSeverity}/5</label>
+                              <input
+                                type="range"
+                                min="1"
+                                max="5"
+                                value={currentEntry.lymphLeftSeverity}
+                                onChange={(e) => setCurrentEntry({...currentEntry, lymphLeftSeverity: e.target.value})}
+                                className="w-full"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={currentEntry.lymphRight}
+                              onChange={(e) => setCurrentEntry({...currentEntry, lymphRight: e.target.checked})}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">Lymph Right</span>
+                          </label>
+                          {currentEntry.lymphRight && (
+                            <div className="ml-6">
+                              <label className="text-sm text-gray-600">Severity: {currentEntry.lymphRightSeverity}/5</label>
+                              <input
+                                type="range"
+                                min="1"
+                                max="5"
+                                value={currentEntry.lymphRightSeverity}
+                                onChange={(e) => setCurrentEntry({...currentEntry, lymphRightSeverity: e.target.value})}
+                                className="w-full"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={currentEntry.mouthSores}
+                            onChange={(e) => setCurrentEntry({...currentEntry, mouthSores: e.target.checked})}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">Mouth Sores</span>
+                        </label>
+
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={currentEntry.colchicine}
+                            onChange={(e) => setCurrentEntry({...currentEntry, colchicine: e.target.checked})}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">Colchicine Taken</span>
+                        </label>
+
+                        <textarea
+                          placeholder="Additional notes..."
+                          value={currentEntry.notes}
+                          onChange={(e) => setCurrentEntry({...currentEntry, notes: e.target.value})}
+                          className="w-full p-2 border rounded"
+                          rows="3"
+                        />
+                      </div>
+
+                      <button
+                        onClick={saveEntry}
+                        className="w-full mt-4 bg-blue-500 text-white p-3 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        <Icon icon={Plus} className="w-5 h-5" />
+                        Save Entry
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {view === 'history' && (
+                  <div className="space-y-4">
+                    <button onClick={exportData} className="w-full bg-green-500 text-white p-2 rounded mb-4">
+                      Export to CSV
+                    </button>
+                    
+                    {entries.map((entry, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-4 shadow-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-medium text-gray-800">
+                            {new Date(entry.timestamp).toLocaleDateString()} - {entry.period}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(entry.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                          {entry.weight && <div>Weight: {entry.weight} kg</div>}
+                          {entry.wakeTime && <div>Wake: {entry.wakeTime}</div>}
+                          {entry.sleepTime && <div>Sleep: {entry.sleepTime}</div>}
+                          {entry.temperature && <div>Temp: {entry.temperature}°C</div>}
+                          <div>Energy: {entry.fatigue}/10</div>
+                          <div>Mood: {entry.mood}/10</div>
+                          {entry.lymphLeft && (
+                            <div>Lymph L: {entry.lymphLeftSeverity}/5</div>
+                          )}
+                          {entry.lymphRight && (
+                            <div>Lymph R: {entry.lymphRightSeverity}/5</div>
+                          )}
+                          {entry.mouthSores && <div>Mouth sores ✓</div>}
+                          {entry.colchicine && <div>Colchicine ✓</div>}
+                        </div>
+                        {entry.notes && (
+                          <div className="mt-2 text-sm text-gray-700 italic">{entry.notes}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {view === 'settings' && (
+                  <div className="bg-white rounded-lg p-4 shadow-sm space-y-4">
+                    <h2 className="font-medium text-lg">Reminder Times</h2>
+                    <div>
+                      <label className="text-sm text-gray-600">Morning Check-in</label>
+                      <input
+                        type="time"
+                        value={morningTime}
+                        onChange={(e) => setMorningTime(e.target.value)}
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600">Evening Check-in</label>
+                      <input
+                        type="time"
+                        value={eveningTime}
+                        onChange={(e) => setEveningTime(e.target.value)}
+                        className="w-full p-2 border rounded"
+                      />
+                    </div>
+                    <button
+                      onClick={saveSettings}
+                      className="w-full bg-blue-500 text-white p-3 rounded-lg font-medium"
+                    >
+                      Save Settings
+                    </button>
+                    <p className="text-xs text-gray-500">
+                      Note: Set iOS reminders at these times to open the app
+                    </p>
+                  </div>
+                )}
+
+                <div className="fixed bottom-0 left-0 right-0 bg-white border-t flex">
+                  <button
+                    onClick={() => setView('entry')}
+                    className={`flex-1 p-4 ${view === 'entry' ? 'text-blue-500' : 'text-gray-400'}`}
+                  >
+                    <Icon icon={Plus} className="w-6 h-6 mx-auto" />
+                  </button>
+                  <button
+                    onClick={() => setView('history')}
+                    className={`flex-1 p-4 ${view === 'history' ? 'text-blue-500' : 'text-gray-400'}`}
+                  >
+                    <Icon icon={TrendingUp} className="w-6 h-6 mx-auto" />
+                  </button>
+                  <button
+                    onClick={() => setView('settings')}
+                    className={`flex-1 p-4 ${view === 'settings' ? 'text-blue-500' : 'text-gray-400'}`}
+                  >
+                    <Icon icon={Settings} className="w-6 h-6 mx-auto" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        ReactDOM.render(<FeverTracker />, document.getElementById('root'));
+    </script>
+</body>
+</html>
